@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billions Quiz App</title>
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Roboto:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="quiz-container">
+        <!-- Header Section -->
+        <div class="header-section">
+            <div class="logo-title">BILLIONS</div>
+            <div class="high-score">🏆 Best: <span id="highScore">0</span></div>
+        </div>
+
+        <!-- Progress & Timer Section -->
+        <div class="game-info">
+            <div class="progress-text" id="progress">Question 1 of 5</div>
+            <div class="timer-container">
+                <div class="timer-bar" id="timerBar"></div>
+                <span class="timer-text" id="timerText">15s</span>
+            </div>
+        </div>
+
+        <!-- Question Section -->
+        <h2 id="question">Question Text</h2>
+
+        <div id="options"></div>
+
+        <!-- Result Message -->
+        <div id="result"></div>
+
+        <!-- Next Button -->
+        <button id="nextBtn" onclick="nextQuestion()">Next ➜</button>
+
+        <!-- Loading Spinner -->
+        <div id="loading" style="display:none;">
+            <div class="loader"></div>
+            <span>Loading next question...</span>
+        </div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="correctSound"
+        src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleF0AAR+Xr9nnd1EAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAAACHs2t/beFAA"></audio>
+    <audio id="wrongSound"
+        src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleF0AAR+Xr9nndlEA"></audio>
+
+    <script>
+        // Updated Questions about the TV Show "Billions"
+        const quizData = [
+            {
+                question: "What does the term “DID” stand for in the context of Billions Network's technology stack?",
+                options: ["Digital Identity Document", "Decentralized Identifier", "Distributed Integration Driver", "Dynamic Interaction Database"],
+                answer: "Decentralized Identifier"
+            },
+            {
+                question: "Which of the following best describes the role of “Privado ID” in the Billions Network ecosystem?",
+                options: ["It supplies a proprietary token used for transaction fees", "It provides the zero‑knowledge verification infrastructure that powers the network", "It operates a centralized exchange for Billions tokens", "It develops the front‑end user interface for mobile applications"],
+                answer: "It provides the zero‑knowledge verification infrastructure that powers the network"
+            },
+            {
+                question: "What is the primary objective of the Billions Network project?",
+                options: ["To create a new decentralized marketplace for trading physical assets", "To establish a privacy-focused verification network for interactions between humans and AI", "To develop a generative AI model that competes with existing Large Language Models", "To provide a high-frequency trading platform for institutional investors"],
+                answer: "To establish a privacy-focused verification network for interactions between humans and AI"
+            },
+            {
+                question: "Which concept is developed by Billions Network?",
+                options: ["KYC", "KYB", "KYA", "KYD"],
+                answer: "KYA"
+            },
+            {
+                question: "Who is the co-founder of Billions Network?",
+                options: ["Evin McMullen", "Nic Cary", "Peter Smith", "Himanshu Tyagi"],
+                answer: "Evin McMullen"
+            }
+        ];
+
+        let currentQuestion = 0;
+        let score = 0;
+        let timerInterval;
+        let timeLeft = 15;
+        const totalTime = 15;
+
+        // Initialize high score from localStorage
+        document.getElementById('highScore').textContent = localStorage.getItem('billionsQuizHighScore') || 0;
+
+        // Shuffle array function
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function loadQuestion() {
+            const questionEl = document.getElementById("question");
+            const optionsEl = document.getElementById("options");
+            const nextBtn = document.getElementById("nextBtn");
+            const progressEl = document.getElementById("progress");
+            const resultEl = document.getElementById("result");
+            const loadingEl = document.getElementById("loading");
+            const timerBar = document.getElementById("timerBar");
+            const timerText = document.getElementById("timerText");
+
+            // Hide loading spinner
+            loadingEl.style.display = "none";
+
+            // Restore visibility of quiz elements
+            questionEl.style.display = "block";
+            optionsEl.style.display = "block";
+            nextBtn.style.display = "none";
+            progressEl.style.display = "block";
+            resultEl.style.display = "block";
+            document.querySelector(".timer-container").style.display = "block";
+
+            // Reset UI
+            resultEl.textContent = "";
+            optionsEl.innerHTML = "";
+
+            // Reset Timer
+            clearInterval(timerInterval);
+            timeLeft = totalTime;
+            timerBar.style.width = "100%";
+            timerBar.style.backgroundColor = "#1a237e";
+            timerText.textContent = `${timeLeft}s`;
+
+            // Update Progress
+            progressEl.textContent = `Question ${currentQuestion + 1} of ${quizData.length}`;
+
+            // Set Question
+            questionEl.textContent = quizData[currentQuestion].question;
+
+            // Shuffle options for this question
+            const currentOptions = [...quizData[currentQuestion].options];
+            const shuffledOptions = shuffleArray(currentOptions);
+
+            // Create Options
+            shuffledOptions.forEach(option => {
+                const btn = document.createElement("div");
+                btn.textContent = option;
+                btn.classList.add("option");
+                btn.onclick = () => selectAnswer(option, btn);
+                optionsEl.appendChild(btn);
+            });
+
+            // Start Timer
+            startTimer();
+        }
+
+        function startTimer() {
+            const timerBar = document.getElementById("timerBar");
+            const timerText = document.getElementById("timerText");
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const percentage = (timeLeft / totalTime) * 100;
+                timerBar.style.width = `${percentage}%`;
+                timerText.textContent = `${timeLeft}s`;
+
+                // Change color based on time left
+                if (timeLeft <= 5) {
+                    timerBar.style.backgroundColor = "#c62828";
+                } else if (timeLeft <= 10) {
+                    timerBar.style.backgroundColor = "#ffd700";
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        function handleTimeOut() {
+            const correctAnswer = quizData[currentQuestion].answer;
+            const options = document.getElementsByClassName("option");
+            const nextBtn = document.getElementById("nextBtn");
+
+            // Highlight correct answer
+            for (let option of options) {
+                if (option.textContent === correctAnswer) {
+                    option.classList.add("correct");
+                }
+                option.style.pointerEvents = "none";
+                option.classList.add("disabled");
+            }
+
+            // Show Next Button
+            nextBtn.style.display = "block";
+        }
+
+        function selectAnswer(selected, btnElement) {
+            // Stop timer
+            clearInterval(timerInterval);
+
+            const correctAnswer = quizData[currentQuestion].answer;
+            const options = document.getElementsByClassName("option");
+            const nextBtn = document.getElementById("nextBtn");
+
+            // Play sound
+            if (selected === correctAnswer) {
+                score++;
+                btnElement.classList.add("correct");
+                playSound('correct');
+            } else {
+                btnElement.classList.add("wrong");
+                playSound('wrong');
+            }
+
+            // Highlight the correct answer if user picked wrong
+            for (let option of options) {
+                if (option.textContent === correctAnswer) {
+                    option.classList.add("correct");
+                }
+                // Disable all clicks
+                option.style.pointerEvents = "none";
+                option.classList.add("disabled");
+            }
+
+            // Show Next Button
+            nextBtn.style.display = "block";
+        }
+
+        function playSound(type) {
+            // Simple beep using Web Audio API as fallback
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                if (type === 'correct') {
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'sine';
+
+                } else {
+                    oscillator.frequency.value = 300;
+                    oscillator.type = 'square';
+                }
+
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.3);
+            } catch (e) {
+                console.log("Audio not supported");
+            }
+        }
+
+        function nextQuestion() {
+            const loadingEl = document.getElementById("loading");
+
+            // Show loading spinner
+            loadingEl.style.display = "block";
+
+            // Hide question/options
+            document.getElementById("question").style.display = "none";
+            document.getElementById("options").style.display = "none";
+            document.getElementById("nextBtn").style.display = "none";
+            document.getElementById("progress").style.display = "none";
+            document.getElementById("result").style.display = "none";
+            document.querySelector(".timer-container").style.display = "none";
+
+            setTimeout(() => {
+                currentQuestion++;
+                if (currentQuestion < quizData.length) {
+                    // Show question/options again
+                    document.getElementById("question").style.display = "block";
+                    document.getElementById("options").style.display = "block";
+                    document.getElementById("progress").style.display = "block";
+                    document.getElementById("result").style.display = "block";
+                    document.querySelector(".timer-container").style.display = "block";
+                    loadQuestion();
+                } else {
+                    showResults();
+                }
+            }, 1000);
+        }
+
+        function showResults() {
+            // Update high score
+            const currentHighScore = parseInt(localStorage.getItem('billionsQuizHighScore') || '0');
+            if (score > currentHighScore) {
+                localStorage.setItem('billionsQuizHighScore', score);
+                document.getElementById('highScore').textContent = score;
+            }
+
+            const container = document.querySelector(".quiz-container");
+            const percentage = (score / quizData.length) * 100;
+
+            let message = "";
+            if (percentage === 100) {
+                message = "🎬 Perfect! You're a true Billions fan!";
+            } else if (percentage >= 60) {
+                message = "👏 Great job! You know Billions very well!";
+            } else {
+                message = "📺 Time to restudy about Billions more!";
+            }
+
+            container.innerHTML = `
+                <div class="header-section">
+                    <div class="logo-title">BILLIONS</div>
+                </div>
+                <h2>Quiz Completed!</h2>
+                <p style="font-size: 1.2rem;">${message}</p>
+                <div class="score-display">
+                    <h1>${score} / ${quizData.length}</h1>
+                </div>
+                <button class="restart-btn" onclick="restartQuiz()">Play Again ↻</button>
+            `;
+        }
+
+        function restartQuiz() {
+            currentQuestion = 0;
+            score = 0;
+            location.reload();
+        }
+
+        // Initialize
+        loadQuestion();
+    </script>
+</body>
+
+</html>
